@@ -1,115 +1,120 @@
 /* 
- * udpserver.c - A simple UDP echo server 
- * usage: udpserver <port>
+ * udpclient.c - A simple UDP client
+ * usage: udpclient <host> <port>
  */
-
 #include <stdio.h>
-#include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
-#include <netdb.h>
-#include <sys/types.h> 
+#include <unistd.h>
+#include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <arpa/inet.h>
+#include <netdb.h> 
+#include <fcntl.h> // Added for file operations
 
 #define BUFSIZE 1024
 
-/*
+/* 
  * error - wrapper for perror
  */
 void error(char *msg) {
-  perror(msg);
-  exit(1);
+    perror(msg);
+    exit(1);
 }
 
 int main(int argc, char **argv) {
-  int sockfd; /* socket */
-  int portno; /* port to listen on */
-  int clientlen; /* byte size of client's address */
-  struct sockaddr_in serveraddr; /* server's addr */
-  struct sockaddr_in clientaddr; /* client addr */
-  struct hostent *hostp; /* client host info */
-  char buf[BUFSIZE]; /* message buf */
-  char *hostaddrp; /* dotted decimal host addr string */
-  int optval; /* flag value for setsockopt */
-  int n; /* message byte size */
+    int sockfd, portno, n;
+    int serverlen;
+    struct sockaddr_in serveraddr;
+    struct hostent *server;
+    char *hostname;
+    char buf[BUFSIZE];
+    char filename[BUFSIZE]; // Added for file upload
+    FILE *file; // Added for file upload
 
-  /* 
-   * check command line arguments 
-   */
-  if (argc != 2) {
-    fprintf(stderr, "usage: %s <port>\n", argv[0]);
-    exit(1);
-  }
-  portno = atoi(argv[1]);
+    /* check command line arguments */
+    if (argc != 3) {
+       fprintf(stderr, "usage: %s <hostname> <port>\n", argv[0]);
+       exit(1);
+    }
+    hostname = argv[1];
+    portno = atoi(argv[2]);
 
-  /* 
-   * socket: create the parent socket 
-   */
-  sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-  if (sockfd < 0) 
-    error("ERROR opening socket");
+    /* socket: create the socket */
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockfd < 0) 
+        error("ERROR opening socket");
 
-  /* setsockopt: Handy debugging trick that lets 
-   * us rerun the server immediately after we kill it; 
-   * otherwise we have to wait about 20 secs. 
-   * Eliminates "ERROR on binding: Address already in use" error. 
-   */
-  optval = 1;
-  setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, 
-	     (const void *)&optval , sizeof(int));
+    /* gethostbyname: get the server's DNS entry */
+    server = gethostbyname(hostname);
+    if (server == NULL) {
+        fprintf(stderr, "ERROR, no such host as %s\n", hostname);
+        exit(1);
+    }
 
-  /*
-   * build the server's Internet address
-   */
-  bzero((char *) &serveraddr, sizeof(serveraddr));
-  serveraddr.sin_family = AF_INET;
-  serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
-  serveraddr.sin_port = htons((unsigned short)portno);
+    /* build the server's Internet address */
+    bzero((char *) &serveraddr, sizeof(serveraddr));
+    serveraddr.sin_family = AF_INET;
+    bcopy((char *)server->h_addr, 
+          (char *)&serveraddr.sin_addr.s_addr, server->h_length);
+    serveraddr.sin_port = htons(portno);
 
-  /* 
-   * bind: associate the parent socket with a port 
-   */
-  if (bind(sockfd, (struct sockaddr *) &serveraddr, 
-	   sizeof(serveraddr)) < 0) 
-    error("ERROR on binding");
+    while (1) {
+        /* Prompt the user to enter a command or file upload */
+        bzero(buf, BUFSIZE);
+        printf("Enter command (e.g., get file.txt, put file.txt, exit): ");
+        fgets(buf, BUFSIZE, stdin);
+        buf[strcspn(buf, "\n")] = '\0';
 
-  /* 
-   * main loop: wait for a datagram, then echo it
-   */
-  clientlen = sizeof(clientaddr);
-  while (1) {
+        if (strncmp(buf, "put ", 4) == 0) {
+            // Handle file upload (put) command
+            sscanf(buf, "put %s", filename);
 
-    /*
-     * recvfrom: receive a UDP datagram from a client
-     */
-    bzero(buf, BUFSIZE);
-    n = recvfrom(sockfd, buf, BUFSIZE, 0,
-		 (struct sockaddr *) &clientaddr, &clientlen);
-    if (n < 0)
-      error("ERROR in recvfrom");
+            // Open the file for reading
+            file = fopen(filename, "rb");
+            if (file == NULL) {
+                perror("Error opening file");
+                continue; // Return to command prompt
+            }
 
-    /* 
-     * gethostbyaddr: determine who sent the datagram
-     */
-    hostp = gethostbyaddr((const char *)&clientaddr.sin_addr.s_addr, 
-			  sizeof(clientaddr.sin_addr.s_addr), AF_INET);
-    if (hostp == NULL)
-      error("ERROR on gethostbyaddr");
-    hostaddrp = inet_ntoa(clientaddr.sin_addr);
-    if (hostaddrp == NULL)
-      error("ERROR on inet_ntoa\n");
-    printf("server received datagram from %s (%s)\n", 
-	   hostp->h_name, hostaddrp);
-    printf("server received %d/%d bytes: %s\n", strlen(buf), n, buf);
-    
-    /* 
-     * sendto: echo the input back to the client 
-     */
-    n = sendto(sockfd, buf, strlen(buf), 0, 
-	       (struct sockaddr *) &clientaddr, clientlen);
-    if (n < 0) 
-      error("ERROR in sendto");
-  }
+            // Send the "put" command to the server
+            serverlen = sizeof(serveraddr);
+            n = sendto(sockfd, buf, strlen(buf), 0, (struct sockaddr*)&serveraddr, serverlen);
+            if (n < 0) 
+                error("ERROR in sendto");
+
+            // Read and send the file content to the server
+            while ((n = fread(buf, 1, BUFSIZE, file)) > 0) {
+                sendto(sockfd, buf, n, 0, (struct sockaddr*)&serveraddr, serverlen);
+            }
+
+            // Close the file
+            fclose(file);
+
+            // Notify the user
+            printf("File '%s' uploaded successfully.\n", filename);
+        } else if (strcmp(buf, "exit") == 0) {
+            // Handle the "exit" command
+            printf("Exiting...\n");
+            close(sockfd);
+            exit(0);
+        } else {
+            // Send other commands to the server
+            serverlen = sizeof(serveraddr);
+            n = sendto(sockfd, buf, strlen(buf), 0, (struct sockaddr*)&serveraddr, serverlen);
+            if (n < 0) 
+                error("ERROR in sendto");
+
+            /* Receive and print the server's response */
+            bzero(buf, BUFSIZE);
+            n = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr*)&serveraddr, &serverlen);
+            if (n < 0) 
+                error("ERROR in recvfrom");
+
+            printf("Server response:\n%s\n", buf);
+        }
+    }
+
+    close(sockfd);
+    return 0;
 }
