@@ -8,6 +8,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <fcntl.h>
+#include <dirent.h> // Added for directory operations
 
 #define BUFSIZE 1024
 #define MAXFILENAME 256
@@ -16,8 +17,8 @@
  * error - wrapper for perror
  */
 void error(char *msg) {
-  perror(msg);
-  exit(1);
+    perror(msg);
+    exit(1);
 }
 
 // Function to send a file to the client
@@ -169,7 +170,6 @@ int main(int argc, char **argv) {
         } else if (strcmp(buf, "ls") == 0) {
             // Handle the "ls" command
             // List files in the local directory and send the list to the client
-
             // Open the current directory
             DIR *dir;
             struct dirent *ent;
@@ -193,7 +193,7 @@ int main(int argc, char **argv) {
                 // Error opening the directory
                 char response[] = "Error opening directory.";
                 sendto(sockfd, response, strlen(response), 0, (struct sockaddr*)&clientaddr, clientlen);
-            }  
+            }
         } else if (strcmp(buf, "exit") == 0) {
             // Handle the "exit" command
             // Gracefully exit the server
@@ -207,8 +207,10 @@ int main(int argc, char **argv) {
             sendto(sockfd, response, strlen(response), 0,
                    (struct sockaddr*)&clientaddr, clientlen);
         }
-    
+    }
+
     // Close the socket and exit (this part will not be reached)
     close(sockfd);
     return 0;
 }
+
