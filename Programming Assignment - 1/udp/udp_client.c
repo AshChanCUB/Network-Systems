@@ -72,8 +72,27 @@ int main(int argc, char *argv[]) {
         fgets(buffer, BUFSIZE, stdin);
 
  
-
-        if (strcmp(buffer, "exit\n") == 0) {
+       if (strcmp(buffer, "ls\n") == 0) {
+            // Handle the "ls" command
+            char response[BUFSIZE];
+            bzero(response, BUFSIZE);
+            
+            // Receive the server's response (the list of files)
+            while (1) {
+                bzero(buffer, BUFSIZE);
+                n = recvfrom(sockfd, buffer, BUFSIZE, 0, (struct sockaddr*)&serveraddr, &serverlen);
+                if (n <= 0) {
+                    break;
+                }
+                if (strcmp(buffer, "END\n") == 0) {
+                    break; // End of response
+                }
+                strcat(response, buffer);
+            }
+            
+            // Print the list of files received from the server
+            printf("List of files on the server:\n%s", response);
+        }else if (strcmp(buffer, "exit\n") == 0) {
             // Handle the "exit" command
             sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr *)&serveraddr, serverlen);
             close(sockfd);
@@ -84,15 +103,12 @@ int main(int argc, char *argv[]) {
             char filename[MAXFILENAME];
             sscanf(buffer, "get %s", filename);
 
- 
-
             // Send the "get" command to the server
             n = sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr *)&serveraddr, serverlen);
             if (n < 0)
                 error("ERROR sending command to server");
 
  
-
             // Receive and save the file from the server
             FILE *received_file = fopen(filename, "wb");
             if (received_file == NULL) {
