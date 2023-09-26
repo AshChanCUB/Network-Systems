@@ -7,7 +7,6 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <stdbool.h> // Include for boolean data type
 
 #define BUFSIZE 1024
 #define MAXFILENAME 256
@@ -67,21 +66,15 @@ int main(int argc, char *argv[]) {
             if (n < 0)
                 error("ERROR sending command to server");
 
-            // Receive the server's response (the list of files)
+            // Receive and print the server's response (the list of files)
             while (1) {
                 bzero(buffer, BUFSIZE);
                 n = recvfrom(sockfd, buffer, BUFSIZE, 0, (struct sockaddr *)&serveraddr, &serverlen);
                 if (n <= 0) {
                     break;
                 }
-                if (strcmp(buffer, "END\n") == 0) {
-                    break; // End of response
-                }
-                strcat(response, buffer);
+                printf("%s", buffer);
             }
-
-            // Print the list of files received from the server
-            printf("List of files on the server:\n%s", response);
         } else if (strcmp(buffer, "exit\n") == 0) {
             // Handle the "exit" command
             n = sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr *)&serveraddr, serverlen);
@@ -115,16 +108,7 @@ int main(int argc, char *argv[]) {
                     fwrite(buffer, 1, n, received_file);
                 }
                 fclose(received_file);
-                
-                // Check for a success message from the server
-                bzero(buffer, BUFSIZE);
-                n = recvfrom(sockfd, buffer, BUFSIZE, 0, (struct sockaddr *)&serveraddr, &serverlen);
-                if (n <= 0) {
-                    error("ERROR receiving success message from server");
-                } else {
-                    printf("Received file: %s\n", filename);
-                    printf("%s", buffer); // Print the success message
-                }
+                printf("Received file: %s\n", filename);
             }
         } else {
             // Send other commands to the server
