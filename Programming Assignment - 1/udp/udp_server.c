@@ -77,7 +77,7 @@ int main(int argc, char *argv[]) {
     int n;
 
     if (argc != 2) {
-        fprintf(stderr, "usage: %s <port>\n", argv[0]);
+        fprintf(stderr, "Usage: %s <port>\n", argv[0]);
         exit(1);
     }
     portno = atoi(argv[1]);
@@ -104,8 +104,14 @@ int main(int argc, char *argv[]) {
         if (n < 0)
             error("ERROR in recvfrom");
 
+        // Remove trailing newline character if present
+        if (buffer[n - 1] == '\n') {
+            buffer[n - 1] = '\0';
+            n--;
+        }
+
         if (strncmp(buffer, "get ", 4) == 0) {
-            char filename[BUFSIZE];
+            char filename[MAXFILENAME];
             sscanf(buffer, "get %s", filename);
 
             if (access(filename, F_OK) != -1) {
@@ -116,7 +122,7 @@ int main(int argc, char *argv[]) {
                 sendto(sockfd, response, strlen(response), 0, (struct sockaddr *)&clientaddr, clientlen);
             }
         } else if (strncmp(buffer, "put ", 4) == 0) {
-            char filename[BUFSIZE];
+            char filename[MAXFILENAME];
             sscanf(buffer, "put %s", filename);
 
             FILE *file = fopen(filename, "wb");
@@ -133,14 +139,6 @@ int main(int argc, char *argv[]) {
                 }
                 fclose(file);
                 printf("Received file: %s\n", filename);
-            }
-        } else if (strncmp(buffer, "delete ", 7) == 0) {
-            char filename[BUFSIZE];
-            sscanf(buffer, "delete %s", filename);
-            if (remove(filename) == 0) {
-                printf("Deleted file: %s\n", filename);
-            } else {
-                perror("Error deleting file");
             }
         } else if (strcmp(buffer, "ls") == 0) {
             listFiles(sockfd, clientaddr, clientlen);
