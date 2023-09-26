@@ -123,11 +123,60 @@ int main(int argc, char *argv[]) {
             if (n <= 0 || strcmp(buffer, "END\n") != 0) {
                 fprintf(stderr, "Failed to receive the file: %s\n", filename);
             }
+        } else if (strncmp(buffer, "put ", 4) == 0) {
+            // Handle the "put" command
+            char filename[MAXFILENAME];
+            sscanf(buffer, "put %s", filename);
+
+            // Check if the file exists on the client side
+            FILE *upload_file = fopen(filename, "rb");
+            if (upload_file == NULL) {
+                fprintf(stderr, "Error opening file for reading: %s\n", filename);
+                continue; // Continue to the next user input
+            }
+
+            // Send the "put" command to the server
+            n = sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr *)&serveraddr, serverlen);
+            if (n < 0) {
+                error("ERROR sending command to server");
+            }
+
+            // Send the file data to the server
+            while (1) {
+                bzero(buffer, BUFSIZE);
+                int bytes_read = fread(buffer, 1, BUFSIZE, upload_file);
+                if (bytes_read <= 0) {
+                    break; // End of file
+                }
+                n = sendto(sockfd, buffer, bytes_read, 0, (struct sockaddr *)&serveraddr, serverlen);
+                if (n < 0) {
+                    error("ERROR sending file data to server");
+                }
+            }
+
+            fclose(upload_file);
+
+            // Send the "END" marker to indicate the end of file transfer
+            char end_marker[] = "END\n";
+            n = sendto(sockfd, end_marker, strlen(end_marker), 0, (struct sockaddr *)&serveraddr, serverlen);
+            if (n < 0) {
+                error("ERROR sending file end marker to server");
+            }
+
+            // Receive the server's response
+            bzero(buffer, BUFSIZE);
+            n = recvfrom(sockfd, buffer, BUFSIZE, 0, (struct sockaddr *)&serveraddr, &serverlen);
+            if (n <= 0) {
+                fprintf(stderr, "Failed to receive server response for: %s\n", filename);
+            } else {
+                printf("Server response: %s\n", buffer);
+            }
         } else {
             // Send other commands to the server
             n = sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr *)&serveraddr, serverlen);
-            if (n < 0)
+            if (n < 0) {
                 error("ERROR sending command to server");
+            }
         }
     }
 
