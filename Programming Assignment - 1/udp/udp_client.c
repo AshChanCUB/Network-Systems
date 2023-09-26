@@ -2,119 +2,92 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <netdb.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <netdb.h> 
-#include <fcntl.h> // Added for file operations
+#include <arpa/inet.h>
 
 #define BUFSIZE 1024
+#define MAXFILENAME 256
 
 void error(char *msg) {
     perror(msg);
     exit(1);
 }
 
-int main(int argc, char **argv) {
-    int sockfd, portno, n;
-    int serverlen;
+int main(int argc, char *argv[]) {
+    int sockfd;
+    int portno;
     struct sockaddr_in serveraddr;
     struct hostent *server;
+    socklen_t serverlen;
     char *hostname;
-    char buf[BUFSIZE];
-    char filename[BUFSIZE]; // Added for file upload
-    FILE *file; // Added for file upload
+    char buffer[BUFSIZE];
+    int n;
 
-    /* check command line arguments */
     if (argc != 3) {
-       fprintf(stderr, "usage: %s <hostname> <port>\n", argv[0]);
-       exit(1);
+        fprintf(stderr, "usage: %s <hostname> <port>\n", argv[0]);
+        exit(0);
     }
     hostname = argv[1];
     portno = atoi(argv[2]);
 
-    /* socket: create the socket */
     sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sockfd < 0) 
+    if (sockfd < 0)
         error("ERROR opening socket");
 
-    /* gethostbyname: get the server's DNS entry */
     server = gethostbyname(hostname);
     if (server == NULL) {
         fprintf(stderr, "ERROR, no such host as %s\n", hostname);
-        exit(1);
+        exit(0);
     }
 
-    /* build the server's Internet address */
-    bzero((char *) &serveraddr, sizeof(serveraddr));
+    bzero((char *)&serveraddr, sizeof(serveraddr));
     serveraddr.sin_family = AF_INET;
-    bcopy((char *)server->h_addr, 
-          (char *)&serveraddr.sin_addr.s_addr, server->h_length);
+    bcopy((char *)server->h_addr, (char *)&serveraddr.sin_addr.s_addr, server->h_length);
     serveraddr.sin_port = htons(portno);
+    serverlen = sizeof(serveraddr);
 
     while (1) {
-        /* Prompt the user to enter a command or file upload */
-        bzero(buf, BUFSIZE);
         printf("Enter command: ");
-        fgets(buf, BUFSIZE, stdin);
-        buf[strcspn(buf, "\n")] = '\0';
+        bzero(buffer, BUFSIZE);
+        fgets(buffer, BUFSIZE, stdin);
 
-        if (strncmp(buf, "put ", 4) == 0) {
-            // Handle file upload (put) command
-            sscanf(buf, "put %s", filename);
-
-            // Open the file for reading
-            file = fopen(filename, "rb");
-            if (file == NULL) {
-                perror("Error opening file");
-                continue; // Return to command prompt
-            }
-
-            // Send the "put" command to the server
-            serverlen = sizeof(serveraddr);
-            n = sendto(sockfd, buf, strlen(buf), 0, (struct sockaddr*)&serveraddr, serverlen);
-            if (n < 0) 
-                error("ERROR in sendto");
-
-            // Read and send the file content to the server
-            while ((n = fread(buf, 1, BUFSIZE, file)) > 0) {
-                sendto(sockfd, buf, n, 0, (struct sockaddr*)&serveraddr, serverlen);
-            }
-
-            // Close the file
-            fclose(file);
-
-            // Notify the user
-            printf("File '%s' uploaded successfully.\n", filename);
-        } else if (strcmp(buf, "exit") == 0) {
-            // Handle the "exit" command
-            printf("Exiting...\n");
+        if (strcmp(buffer, "exit\n") == 0) {
+            sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr *)&serveraddr, serverlen);
             close(sockfd);
+            printf("Client is exiting.\n");
             exit(0);
-        } else {
-        // Send other commands to the server
-        serverlen = sizeof(serveraddr);
-        n = sendto(sockfd, buf, strlen(buf), 0, (struct sockaddr*)&serveraddr, serverlen);
-        if (n < 0) 
-            error("ERROR in sendto");
+        } else if (strncmp(buffer, "get ", 4) == 0) {
+            char filename[MAXFILENAME];
+            sscanf(buffer, "get %s", filename);
 
-        // Receive and print the server's response
-        while (1) {
-            bzero(buf, BUFSIZE); // Clear the buffer
-            n = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr*)&serveraddr, &serverlen);
-            if (n < 0) 
-                error("ERROR in recvfrom");
+            n = sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr *)&serveraddr, serverlen);
+            if (n < 0)
+                error("ERROR sending command to server");
 
-            // Check for the end-of-response marker
-            if (strcmp(buf, "END\n") == 0) {
-                break; // Exit the loop when the marker is received
+            FILE *received_file = fopen(filename, "wb"); // Open in binary write mode
+            if (received_file == NULL) {
+                perror("Error opening file for writing");
+            } else {
+                while (1) {
+                    bzero(buffer, BUFSIZE);
+                    n = recvfrom(sockfd, buffer, BUFSIZE, 0, (struct sockaddr *)&serveraddr, &serverlen);
+                    if (n <= 0) {
+                        break;
+                    }
+                    fwrite(buffer, 1, n, received_file); // Write binary data to the file
+                }
+                fclose(received_file);
+                printf("Received file: %s\n", filename);
             }
-
-            // Print the received data (excluding the marker)
-            printf("%s", buf);
+        } else {
+            n = sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr *)&serveraddr, serverlen);
+            if (n < 0)
+                error("ERROR sending command to server");
         }
     }
-}
 
     close(sockfd);
     return 0;
