@@ -38,6 +38,8 @@ void sendFile(int sockfd, struct sockaddr_in clientaddr, socklen_t clientlen, ch
     }
 
     fclose(file);
+    
+    // Send the "END\n" marker to indicate the end of file transfer
     char end_marker[] = "END\n";
     sendto(sockfd, end_marker, strlen(end_marker), 0, (struct sockaddr *)&clientaddr, clientlen);
 }
@@ -140,7 +142,10 @@ int main(int argc, char *argv[]) {
                 }
                 fclose(file);
                 printf("File transfer successful: %s\n", filename); // Print success message
+
             }
+            char end_marker[] = "END\n";
+            sendto(sockfd, end_marker, strlen(end_marker), 0, (struct sockaddr *)&clientaddr, clientlen);
         } else if (strcmp(buffer, "ls") == 0) {
             listFiles(sockfd, clientaddr, clientlen);
         } else if (strncmp(buffer, "delete ", 7) == 0) {
