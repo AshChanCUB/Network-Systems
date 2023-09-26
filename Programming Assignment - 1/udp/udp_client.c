@@ -1,7 +1,3 @@
-/* 
- * udpclient.c - A simple UDP client
- * usage: udpclient <host> <port>
- */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -14,9 +10,6 @@
 
 #define BUFSIZE 1024
 
-/* 
- * error - wrapper for perror
- */
 void error(char *msg) {
     perror(msg);
     exit(1);
