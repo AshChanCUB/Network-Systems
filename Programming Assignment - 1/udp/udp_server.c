@@ -19,7 +19,10 @@ void error(char *msg) {
 }
 
 void sendFile(int sockfd, struct sockaddr_in clientaddr, socklen_t clientlen, char *filename) {
-    FILE *file = fopen(filename, "rb");
+    char filepath[MAXFILENAME];
+    snprintf(filepath, MAXFILENAME, "./server/%s", filename); // Assuming files are in the "./server/" directory
+
+    FILE *file = fopen(filepath, "rb");
     if (file == NULL) {
         char error_msg[] = "File not found.";
         sendto(sockfd, error_msg, strlen(error_msg), 0, (struct sockaddr *)&clientaddr, clientlen);
