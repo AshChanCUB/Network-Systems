@@ -1,34 +1,28 @@
 #include <stdio.h>
-#include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <netdb.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <dirent.h>
 #include <fcntl.h>
-#include <dirent.h> // Added for directory operations
 
 #define BUFSIZE 1024
 #define MAXFILENAME 256
 
-/*
- * error - wrapper for perror
- */
 void error(char *msg) {
     perror(msg);
     exit(1);
 }
 
-// Function to send a file to the client
-void sendFile(int sockfd, struct sockaddr_in clientaddr, socklen_t clientlen, char* filename) {
-    // Open the file for reading in binary mode
+void sendFile(int sockfd, struct sockaddr_in clientaddr, socklen_t clientlen, char *filename) {
     FILE *file = fopen(filename, "rb");
     if (file == NULL) {
-        // File not found, send an error message
         char error_msg[] = "File not found.";
-        sendto(sockfd, error_msg, strlen(error_msg), 0, (struct sockaddr*)&clientaddr, clientlen);
+        sendto(sockfd, error_msg, strlen(error_msg), 0, (struct sockaddr *)&clientaddr, clientlen);
         return;
     }
 
@@ -36,180 +30,134 @@ void sendFile(int sockfd, struct sockaddr_in clientaddr, socklen_t clientlen, ch
     ssize_t bytes_read;
 
     while ((bytes_read = fread(buffer, 1, BUFSIZE, file)) > 0) {
-        // Send the file data to the client
-        ssize_t bytes_sent = sendto(sockfd, buffer, bytes_read, 0, (struct sockaddr*)&clientaddr, clientlen);
+        ssize_t bytes_sent = sendto(sockfd, buffer, bytes_read, 0, (struct sockaddr *)&clientaddr, clientlen);
         if (bytes_sent < 0) {
             perror("Error sending file data");
             break;
         }
     }
 
-    // Close the file
     fclose(file);
-    
-    // Send an end-of-response marker
     char end_marker[] = "END\n";
-    sendto(sockfd, end_marker, strlen(end_marker), 0, (struct sockaddr*)&clientaddr, clientlen);
+    sendto(sockfd, end_marker, strlen(end_marker), 0, (struct sockaddr *)&clientaddr, clientlen);
 }
 
-int main(int argc, char **argv) {
-    int sockfd; /* socket */
-    int portno; /* port to listen on */
-    socklen_t clientlen; /* byte size of client's address */
-    struct sockaddr_in serveraddr; /* server's addr */
-    struct sockaddr_in clientaddr; /* client addr */
-    char buf[BUFSIZE]; /* message buf */
-    int optval; /* flag value for setsockopt */
-    int n; /* message byte size */
+void listFiles(int sockfd, struct sockaddr_in clientaddr, socklen_t clientlen) {
+    DIR *dir;
+    struct dirent *ent;
+    char file_list[BUFSIZE] = "";
 
-    /* 
-     * check command line arguments 
-     */
+    if ((dir = opendir(".")) != NULL) {
+        while ((ent = readdir(dir)) != NULL) {
+            if (ent->d_type == DT_REG) {
+                strcat(file_list, ent->d_name);
+                strcat(file_list, "\n");
+            }
+        }
+        closedir(dir);
+
+        ssize_t n = sendto(sockfd, file_list, strlen(file_list), 0, (struct sockaddr *)&clientaddr, clientlen);
+        if (n < 0) {
+            error("ERROR in sendto");
+        }
+    } else {
+        char response[] = "Error opening directory.\n";
+        sendto(sockfd, response, strlen(response), 0, (struct sockaddr *)&clientaddr, clientlen);
+    }
+}
+
+int main(int argc, char *argv[]) {
+    int sockfd;
+    int portno;
+    struct sockaddr_in serveraddr;
+    struct sockaddr_in clientaddr;
+    socklen_t clientlen;
+    char buffer[BUFSIZE];
+    int optval = 1;
+    int n;
+
     if (argc != 2) {
         fprintf(stderr, "usage: %s <port>\n", argv[0]);
         exit(1);
     }
     portno = atoi(argv[1]);
 
-    /* 
-     * socket: create the parent socket 
-     */
     sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sockfd < 0) 
+    if (sockfd < 0)
         error("ERROR opening socket");
 
-    /* setsockopt: Handy debugging trick that lets 
-     * us rerun the server immediately after we kill it; 
-     * otherwise we have to wait about 20 secs. 
-     * Eliminates "ERROR on binding: Address already in use" error. 
-     */
-    optval = 1;
-    setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, 
-             (const void *)&optval , sizeof(int));
+    setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, (const void *)&optval, sizeof(int));
 
-    /*
-     * build the server's Internet address
-     */
-    bzero((char *) &serveraddr, sizeof(serveraddr));
+    bzero((char *)&serveraddr, sizeof(serveraddr));
     serveraddr.sin_family = AF_INET;
     serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
     serveraddr.sin_port = htons((unsigned short)portno);
 
-    /* 
-     * bind: associate the parent socket with a port 
-     */
-    if (bind(sockfd, (struct sockaddr *) &serveraddr, 
-           sizeof(serveraddr)) < 0) 
+    if (bind(sockfd, (struct sockaddr *)&serveraddr, sizeof(serveraddr)) < 0)
         error("ERROR on binding");
 
-    /* 
-     * main loop: wait for a datagram, then process the command
-     */
     clientlen = sizeof(clientaddr);
+
     while (1) {
-        /*
-         * recvfrom: receive a UDP datagram from a client
-         */
-        bzero(buf, BUFSIZE);
-        n = recvfrom(sockfd, buf, BUFSIZE, 0,
-             (struct sockaddr *) &clientaddr, &clientlen);
+        bzero(buffer, BUFSIZE);
+        n = recvfrom(sockfd, buffer, BUFSIZE, 0, (struct sockaddr *)&clientaddr, &clientlen);
         if (n < 0)
             error("ERROR in recvfrom");
 
-        // Determine the command and process it
-        else if (strncmp(buf, "get ", 4) == 0) {
-            // Handle the "get [file_name]" command
+        if (strncmp(buffer, "get ", 4) == 0) {
             char filename[BUFSIZE];
-            sscanf(buf, "get %s", filename);
-            // Check if the file exists
+            sscanf(buffer, "get %s", filename);
+
             if (access(filename, F_OK) != -1) {
-                // Send the file to the client
                 sendFile(sockfd, clientaddr, clientlen, filename);
             } else {
-                // File not found, send an error message
                 char response[BUFSIZE];
                 snprintf(response, BUFSIZE, "File not found: %s", filename);
-                sendto(sockfd, response, strlen(response), 0,
-                       (struct sockaddr*)&clientaddr, clientlen);
+                sendto(sockfd, response, strlen(response), 0, (struct sockaddr *)&clientaddr, clientlen);
             }
-        } else if (strncmp(buf, "put ", 4) == 0) {
-            // Handle the "put [file_name]" command
+        } else if (strncmp(buffer, "put ", 4) == 0) {
             char filename[BUFSIZE];
-            sscanf(buf, "put %s", filename);
-            // Open the file for writing
+            sscanf(buffer, "put %s", filename);
+
             FILE *file = fopen(filename, "wb");
             if (file == NULL) {
                 perror("Error opening file");
             } else {
-                // Receive and write the file data from the client
                 while (1) {
-                    bzero(buf, BUFSIZE);
-                    n = recvfrom(sockfd, buf, BUFSIZE, 0,
-                                 (struct sockaddr*)&clientaddr, &clientlen);
+                    bzero(buffer, BUFSIZE);
+                    n = recvfrom(sockfd, buffer, BUFSIZE, 0, (struct sockaddr *)&clientaddr, &clientlen);
                     if (n <= 0) {
                         break;
                     }
-                    fwrite(buf, 1, n, file);
+                    fwrite(buffer, 1, n, file);
                 }
                 fclose(file);
                 printf("Received file: %s\n", filename);
             }
-        } else if (strncmp(buf, "delete ", 7) == 0) {
-            // Handle the "delete [file_name]" command
+        } else if (strncmp(buffer, "delete ", 7) == 0) {
             char filename[BUFSIZE];
-            sscanf(buf, "delete %s", filename);
+            sscanf(buffer, "delete %s", filename);
             if (remove(filename) == 0) {
                 printf("Deleted file: %s\n", filename);
             } else {
                 perror("Error deleting file");
             }
-        } else if (strcmp(buf, "ls") == 0) {
-            // Handle the "ls" command
-            // List files in the local directory and send the list to the client
-            // Open the current directory
-            DIR *dir;
-            struct dirent *ent;
-            char file_list[BUFSIZE] = "";
-
-            if ((dir = opendir(".")) != NULL) {
-                // Iterate through the directory entries and concatenate filenames
-                while ((ent = readdir(dir)) != NULL) {
-                    if (ent->d_type == DT_REG) {  // Check if it's a regular file
-                        strcat(file_list, ent->d_name);
-                        strcat(file_list, "\n");
-                    }
-                }
-                closedir(dir);
-
-                                // Send the list of files to the client
-                n = sendto(sockfd, file_list, strlen(file_list), 0, (struct sockaddr*)&clientaddr, clientlen);
-                if (n < 0)
-                    error("ERROR in sendto");
-            } else {
-                // Error opening the directory
-                char response[] = "Error opening directory.\n";
-                sendto(sockfd, response, strlen(response), 0, (struct sockaddr*)&clientaddr, clientlen);
-            }
-        } else if (strcmp(buf, "exit") == 0) {
-            // Handle the "exit" command
-            // Gracefully exit the server
+        } else if (strcmp(buffer, "ls") == 0) {
+            listFiles(sockfd, clientaddr, clientlen);
+        } else if (strcmp(buffer, "exit") == 0) {
             printf("Server is exiting gracefully.\n");
             close(sockfd);
             exit(0);
         } else {
-            // For any other commands, echo back to the client with a message
             char response[BUFSIZE];
-            snprintf(response, BUFSIZE, "Unknown command: %s\n", buf);
-            sendto(sockfd, response, strlen(response), 0, (struct sockaddr*)&clientaddr, clientlen);
+            snprintf(response, BUFSIZE, "Unknown command: %s\n", buffer);
+            sendto(sockfd, response, strlen(response), 0, (struct sockaddr *)&clientaddr, clientlen);
         }
 
-        // Send an end-of-response marker
         char end_marker[] = "END\n";
-        sendto(sockfd, end_marker, strlen(end_marker), 0, (struct sockaddr*)&clientaddr, clientlen);
+        sendto(sockfd, end_marker, strlen(end_marker), 0, (struct sockaddr *)&clientaddr, clientlen);
     }
 
-    // Close the socket and exit (this part will not be reached)
     close(sockfd);
     return 0;
 }
-
