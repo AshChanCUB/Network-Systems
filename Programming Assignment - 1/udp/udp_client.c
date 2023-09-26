@@ -92,20 +92,20 @@ int main(int argc, char **argv) {
             close(sockfd);
             exit(0);
         } else {
-            // Send other commands to the server
-            serverlen = sizeof(serveraddr);
-            n = sendto(sockfd, buf, strlen(buf), 0, (struct sockaddr*)&serveraddr, serverlen);
-            if (n < 0) 
-                error("ERROR in sendto");
+        // Send other commands to the server
+        serverlen = sizeof(serveraddr);
+        n = sendto(sockfd, buf, strlen(buf), 0, (struct sockaddr*)&serveraddr, serverlen);
+        if (n < 0) 
+            error("ERROR in sendto");
 
-            /* Receive and print the server's response */
-            bzero(buf, BUFSIZE);
-            n = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr*)&serveraddr, &serverlen);
-            if (n < 0) 
-                error("ERROR in recvfrom");
+        /* Receive and print the server's response */
+        bzero(buf, BUFSIZE); // Clear the buffer
+        n = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr*)&serveraddr, &serverlen);
+        if (n < 0) 
+            error("ERROR in recvfrom");
 
-            printf("Server response:\n%s\n", buf);
-        }
+        printf("Server response:\n%s\n", buf);
+    }
     }
 
     close(sockfd);
