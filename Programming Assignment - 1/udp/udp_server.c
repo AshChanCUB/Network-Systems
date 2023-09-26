@@ -142,7 +142,22 @@ int main(int argc, char *argv[]) {
             }
         } else if (strcmp(buffer, "ls") == 0) {
             listFiles(sockfd, clientaddr, clientlen);
-        } else if (strcmp(buffer, "exit") == 0) {
+        } else if (strncmp(buffer, "delete ", 7) == 0) {
+                // Handle the "delete [file_name]" command
+                char filename[BUFSIZE];
+                sscanf(buffer, "delete %s", filename);
+                if (remove(filename) == 0) {
+                    printf("Deleted file: %s\n", filename);
+                    // Send a confirmation message to the client
+                    char response[] = "File deleted successfully.\n";
+                    sendto(sockfd, response, strlen(response), 0, (struct sockaddr *)&clientaddr, clientlen);
+                } else {
+                    perror("Error deleting file");
+                    // Send an error message to the client
+                    char response[] = "Error deleting file.\n";
+                    sendto(sockfd, response, strlen(response), 0, (struct sockaddr *)&clientaddr, clientlen);
+                }
+            } else if (strcmp(buffer, "exit") == 0) {
             printf("Server is exiting gracefully.\n");
             close(sockfd);
             exit(0);
