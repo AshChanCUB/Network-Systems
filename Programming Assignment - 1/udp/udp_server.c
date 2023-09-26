@@ -19,7 +19,7 @@ void error(char *msg) {
 }
 
 void sendFile(int sockfd, struct sockaddr_in clientaddr, socklen_t clientlen, char *filename) {
-    FILE *file = fopen(filename, "rb"); // Open the file in binary read mode
+    FILE *file = fopen(filename, "rb");
     if (file == NULL) {
         char error_msg[] = "File not found.";
         sendto(sockfd, error_msg, strlen(error_msg), 0, (struct sockaddr *)&clientaddr, clientlen);
@@ -27,7 +27,7 @@ void sendFile(int sockfd, struct sockaddr_in clientaddr, socklen_t clientlen, ch
     }
 
     char buffer[BUFSIZE];
-    size_t bytes_read;
+    ssize_t bytes_read;
 
     while ((bytes_read = fread(buffer, 1, BUFSIZE, file)) > 0) {
         ssize_t bytes_sent = sendto(sockfd, buffer, bytes_read, 0, (struct sockaddr *)&clientaddr, clientlen);
@@ -116,6 +116,7 @@ int main(int argc, char *argv[]) {
 
             if (access(filename, F_OK) != -1) {
                 sendFile(sockfd, clientaddr, clientlen, filename);
+                printf("File transfer successful: %s\n", filename); // Print success message
             } else {
                 char response[BUFSIZE];
                 snprintf(response, BUFSIZE, "File not found: %s", filename);
@@ -125,7 +126,7 @@ int main(int argc, char *argv[]) {
             char filename[MAXFILENAME];
             sscanf(buffer, "put %s", filename);
 
-            FILE *file = fopen(filename, "wb"); // Open the file in binary write mode
+            FILE *file = fopen(filename, "wb");
             if (file == NULL) {
                 perror("Error opening file");
             } else {
@@ -138,7 +139,7 @@ int main(int argc, char *argv[]) {
                     fwrite(buffer, 1, n, file);
                 }
                 fclose(file);
-                printf("Received file: %s\n", filename);
+                printf("File transfer successful: %s\n", filename); // Print success message
             }
         } else if (strcmp(buffer, "ls") == 0) {
             listFiles(sockfd, clientaddr, clientlen);
