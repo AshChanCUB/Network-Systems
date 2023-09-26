@@ -60,65 +60,29 @@ int main(int argc, char *argv[]) {
             printf("Client is exiting.\n");
             exit(0);
         } else if (strncmp(buffer, "get ", 4) == 0) {
-            // Handle the "get" command
             char filename[MAXFILENAME];
             sscanf(buffer, "get %s", filename);
 
-            // Send the "get" command to the server
             n = sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr *)&serveraddr, serverlen);
             if (n < 0)
                 error("ERROR sending command to server");
 
-            // Receive and save the file from the server
-            FILE *received_file = fopen(filename, "wb");
+            FILE *received_file = fopen(filename, "wb"); // Open in binary write mode
             if (received_file == NULL) {
                 perror("Error opening file for writing");
             } else {
-                // Receive and write the file data from the server
                 while (1) {
                     bzero(buffer, BUFSIZE);
                     n = recvfrom(sockfd, buffer, BUFSIZE, 0, (struct sockaddr *)&serveraddr, &serverlen);
-                    if (n <= 0 || strncmp(buffer, "END\n", 4) == 0) {
+                    if (n <= 0) {
                         break;
                     }
-                    fwrite(buffer, 1, n, received_file);
+                    fwrite(buffer, 1, n, received_file); // Write binary data to the file
                 }
                 fclose(received_file);
                 printf("Received file: %s\n", filename);
-        } else if (strncmp(buffer, "put ", 4) == 0) {
-            // Handle the "put" command
-            char filename[MAXFILENAME];
-            sscanf(buffer, "put %s", filename);
-
-            // Send the "put" command to the server
-            n = sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr *)&serveraddr, serverlen);
-            if (n < 0)
-                error("ERROR sending command to server");
-
-            // Send the file to the server
-            FILE *sent_file = fopen(filename, "rb");
-            if (sent_file == NULL) {
-                perror("Error opening file for reading");
-            } else {
-                while (1) {
-                    bzero(buffer, BUFSIZE);
-                    int bytes_read = fread(buffer, 1, BUFSIZE, sent_file);
-                    if (bytes_read <= 0) {
-                        break;
-                    }
-                    n = sendto(sockfd, buffer, bytes_read, 0, (struct sockaddr *)&serveraddr, serverlen);
-                    if (n < 0) {
-                        error("ERROR sending file to server");
-                    }
-                }
-                fclose(sent_file);
-                printf("Sent file: %s\n", filename);
-                // Send an "END" message to indicate the end of the file
-                strcpy(buffer, "END\n");
-                sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr *)&serveraddr, serverlen);
             }
-        }
-        else {
+        } else {
             n = sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr *)&serveraddr, serverlen);
             if (n < 0)
                 error("ERROR sending command to server");
