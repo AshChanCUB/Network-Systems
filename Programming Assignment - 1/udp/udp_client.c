@@ -100,7 +100,7 @@ int main(int argc, char *argv[]) {
                 error("ERROR sending command to server");
 
             // Receive and save the file from the server
-            FILE *received_file = fopen(filename, "wb");
+            FILE *received_file = fopen(filename, "wb"); // Open the file in binary write mode
             if (received_file == NULL) {
                 perror("Error opening file for writing");
             } else {
@@ -108,17 +108,13 @@ int main(int argc, char *argv[]) {
                 while (1) {
                     bzero(buffer, BUFSIZE);
                     n = recvfrom(sockfd, buffer, BUFSIZE, 0, (struct sockaddr *)&serveraddr, &serverlen);
-                    if (n <= 0 || strcmp(buffer, "END\n") == 0) {
+                    if (n <= 0) {
                         break;
                     }
                     fwrite(buffer, 1, n, received_file);
                 }
                 fclose(received_file);
-                if (n <= 0) {
-                    printf("Failed to receive the file: %s\n", filename);
-                } else {
-                    printf("Received file: %s\n", filename);
-                }
+                printf("Received file: %s\n", filename);
             }
         } else {
             // Send other commands to the server
