@@ -93,12 +93,12 @@ int main(int argc, char *argv[]) {
             // Handle the "get" command
             char filename[MAXFILENAME];
             sscanf(buffer, "get %s", filename);
-
+    
             // Send the "get" command to the server
             n = sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr *)&serveraddr, serverlen);
             if (n < 0)
                 error("ERROR sending command to server");
-
+    
             // Receive and save the file from the server
             FILE *received_file = fopen(filename, "wb");
             if (received_file == NULL) {
@@ -117,7 +117,7 @@ int main(int argc, char *argv[]) {
                 printf("Received file: %s\n", filename);
                 printf("File transfer successful.\n"); // Print success message
             }
-            continue;
+    
         } else if (strncmp(buffer, "put ", 4) == 0) {
             // Handle the "put" command
             char filename[MAXFILENAME];
