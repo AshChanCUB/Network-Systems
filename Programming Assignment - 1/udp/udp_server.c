@@ -9,7 +9,6 @@
 #include <arpa/inet.h>
 #include <dirent.h>
 #include <fcntl.h>
-#include <stdbool.h> // Include for boolean data type
 
 #define BUFSIZE 1024
 #define MAXFILENAME 256
@@ -20,7 +19,7 @@ void error(char *msg) {
 }
 
 void sendFile(int sockfd, struct sockaddr_in clientaddr, socklen_t clientlen, char *filename) {
-    FILE *file = fopen(filename, "rb");
+    FILE *file = fopen(filename, "rb"); // Open the file in binary read mode
     if (file == NULL) {
         char error_msg[] = "File not found.";
         sendto(sockfd, error_msg, strlen(error_msg), 0, (struct sockaddr *)&clientaddr, clientlen);
@@ -28,7 +27,7 @@ void sendFile(int sockfd, struct sockaddr_in clientaddr, socklen_t clientlen, ch
     }
 
     char buffer[BUFSIZE];
-    ssize_t bytes_read;
+    size_t bytes_read;
 
     while ((bytes_read = fread(buffer, 1, BUFSIZE, file)) > 0) {
         ssize_t bytes_sent = sendto(sockfd, buffer, bytes_read, 0, (struct sockaddr *)&clientaddr, clientlen);
@@ -39,10 +38,8 @@ void sendFile(int sockfd, struct sockaddr_in clientaddr, socklen_t clientlen, ch
     }
 
     fclose(file);
-    
-    // Send a success message to the client
-    char success_msg[] = "File transfer successful.\n";
-    sendto(sockfd, success_msg, strlen(success_msg), 0, (struct sockaddr *)&clientaddr, clientlen);
+    char end_marker[] = "END\n";
+    sendto(sockfd, end_marker, strlen(end_marker), 0, (struct sockaddr *)&clientaddr, clientlen);
 }
 
 void listFiles(int sockfd, struct sockaddr_in clientaddr, socklen_t clientlen) {
@@ -128,7 +125,7 @@ int main(int argc, char *argv[]) {
             char filename[MAXFILENAME];
             sscanf(buffer, "put %s", filename);
 
-            FILE *file = fopen(filename, "wb");
+            FILE *file = fopen(filename, "wb"); // Open the file in binary write mode
             if (file == NULL) {
                 perror("Error opening file");
             } else {
@@ -141,11 +138,6 @@ int main(int argc, char *argv[]) {
                     fwrite(buffer, 1, n, file);
                 }
                 fclose(file);
-                
-                // Send a success message to the client
-                char success_msg[] = "File received and saved successfully.\n";
-                sendto(sockfd, success_msg, strlen(success_msg), 0, (struct sockaddr *)&clientaddr, clientlen);
-                
                 printf("Received file: %s\n", filename);
             }
         } else if (strcmp(buffer, "ls") == 0) {
@@ -155,12 +147,10 @@ int main(int argc, char *argv[]) {
             sscanf(buffer, "delete %s", filename);
             if (remove(filename) == 0) {
                 printf("Deleted file: %s\n", filename);
-                // Send a success message to the client
-                char success_msg[] = "File deleted successfully.\n";
-                sendto(sockfd, success_msg, strlen(success_msg), 0, (struct sockaddr *)&clientaddr, clientlen);
+                char response[] = "File deleted successfully.\n";
+                sendto(sockfd, response, strlen(response), 0, (struct sockaddr *)&clientaddr, clientlen);
             } else {
                 perror("Error deleting file");
-                // Send an error message to the client
                 char response[] = "Error deleting file.\n";
                 sendto(sockfd, response, strlen(response), 0, (struct sockaddr *)&clientaddr, clientlen);
             }
@@ -173,8 +163,7 @@ int main(int argc, char *argv[]) {
             snprintf(response, BUFSIZE, "Unknown command: %s\n", buffer);
             sendto(sockfd, response, strlen(response), 0, (struct sockaddr *)&clientaddr, clientlen);
         }
-        
-        // Send an "END" marker to indicate the end of the response
+
         char end_marker[] = "END\n";
         sendto(sockfd, end_marker, strlen(end_marker), 0, (struct sockaddr *)&clientaddr, clientlen);
     }
