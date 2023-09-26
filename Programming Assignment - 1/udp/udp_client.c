@@ -103,7 +103,6 @@ int main(int argc, char *argv[]) {
             FILE *received_file = fopen(filename, "wb");
             if (received_file == NULL) {
                 perror("Error opening file for writing");
-                printf("File transfer failed.\n");
             } else {
                 // Receive and write the file data from the server
                 while (1) {
@@ -117,8 +116,8 @@ int main(int argc, char *argv[]) {
                 fclose(received_file);
                 printf("Received file: %s\n", filename);
                 printf("File transfer successful.\n"); // Print success message
-                break; // Exit the loop after successful transfer
             }
+            continue;
         } else if (strncmp(buffer, "put ", 4) == 0) {
             // Handle the "put" command
             char filename[MAXFILENAME];
