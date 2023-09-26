@@ -23,9 +23,9 @@ void error(char *msg) {
 
 // Function to send a file to the client
 void sendFile(int sockfd, struct sockaddr_in clientaddr, socklen_t clientlen, char* filename) {
-    // Open the file for reading
-    int fd = open(filename, O_RDONLY);
-    if (fd < 0) {
+    // Open the file for reading in binary mode
+    FILE *file = fopen(filename, "rb");
+    if (file == NULL) {
         // File not found, send an error message
         char error_msg[] = "File not found.";
         sendto(sockfd, error_msg, strlen(error_msg), 0, (struct sockaddr*)&clientaddr, clientlen);
@@ -35,13 +35,13 @@ void sendFile(int sockfd, struct sockaddr_in clientaddr, socklen_t clientlen, ch
     char buffer[BUFSIZE];
     ssize_t bytes_read;
 
-    while ((bytes_read = read(fd, buffer, BUFSIZE)) > 0) {
+    while ((bytes_read = fread(buffer, 1, BUFSIZE, file)) > 0) {
         // Send the file data to the client
         sendto(sockfd, buffer, bytes_read, 0, (struct sockaddr*)&clientaddr, clientlen);
     }
 
     // Close the file
-    close(fd);
+    fclose(file);
 }
 
 int main(int argc, char **argv) {
