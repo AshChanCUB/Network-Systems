@@ -117,6 +117,7 @@ int main(int argc, char *argv[]) {
                 fclose(received_file);
                 printf("Received file: %s\n", filename);
                 printf("File transfer successful.\n"); // Print success message
+                break; // Exit the loop after successful transfer
             }
         } else if (strncmp(buffer, "put ", 4) == 0) {
             // Handle the "put" command
