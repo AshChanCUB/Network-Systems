@@ -37,11 +37,19 @@ void sendFile(int sockfd, struct sockaddr_in clientaddr, socklen_t clientlen, ch
 
     while ((bytes_read = fread(buffer, 1, BUFSIZE, file)) > 0) {
         // Send the file data to the client
-        sendto(sockfd, buffer, bytes_read, 0, (struct sockaddr*)&clientaddr, clientlen);
+        ssize_t bytes_sent = sendto(sockfd, buffer, bytes_read, 0, (struct sockaddr*)&clientaddr, clientlen);
+        if (bytes_sent < 0) {
+            perror("Error sending file data");
+            break;
+        }
     }
 
     // Close the file
     fclose(file);
+    
+    // Send an end-of-response marker
+    char end_marker[] = "END\n";
+    sendto(sockfd, end_marker, strlen(end_marker), 0, (struct sockaddr*)&clientaddr, clientlen);
 }
 
 int main(int argc, char **argv) {
@@ -115,20 +123,8 @@ int main(int argc, char **argv) {
             sscanf(buf, "get %s", filename);
             // Check if the file exists
             if (access(filename, F_OK) != -1) {
-                // Open the file for reading
-                FILE *file = fopen(filename, "rb");
-                if (file == NULL) {
-                    perror("Error opening file");
-                } else {
-                    // Read and send the file to the client
-                    char filebuf[BUFSIZE];
-                    while (!feof(file)) {
-                        size_t bytesRead = fread(filebuf, 1, BUFSIZE, file);
-                        sendto(sockfd, filebuf, bytesRead, 0,
-                               (struct sockaddr*)&clientaddr, clientlen);
-                    }
-                    fclose(file);
-                }
+                // Send the file to the client
+                sendFile(sockfd, clientaddr, clientlen, filename);
             } else {
                 // File not found, send an error message
                 char response[BUFSIZE];
@@ -185,13 +181,13 @@ int main(int argc, char **argv) {
                 }
                 closedir(dir);
 
-                // Send the list of files to the client
+                                // Send the list of files to the client
                 n = sendto(sockfd, file_list, strlen(file_list), 0, (struct sockaddr*)&clientaddr, clientlen);
                 if (n < 0)
                     error("ERROR in sendto");
             } else {
                 // Error opening the directory
-                char response[] = "Error opening directory.";
+                char response[] = "Error opening directory.\n";
                 sendto(sockfd, response, strlen(response), 0, (struct sockaddr*)&clientaddr, clientlen);
             }
         } else if (strcmp(buf, "exit") == 0) {
@@ -203,10 +199,13 @@ int main(int argc, char **argv) {
         } else {
             // For any other commands, echo back to the client with a message
             char response[BUFSIZE];
-            snprintf(response, BUFSIZE, "Unknown command: %s", buf);
-            sendto(sockfd, response, strlen(response), 0,
-                   (struct sockaddr*)&clientaddr, clientlen);
+            snprintf(response, BUFSIZE, "Unknown command: %s\n", buf);
+            sendto(sockfd, response, strlen(response), 0, (struct sockaddr*)&clientaddr, clientlen);
         }
+
+        // Send an end-of-response marker
+        char end_marker[] = "END\n";
+        sendto(sockfd, end_marker, strlen(end_marker), 0, (struct sockaddr*)&clientaddr, clientlen);
     }
 
     // Close the socket and exit (this part will not be reached)
