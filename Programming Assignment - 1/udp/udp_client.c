@@ -62,7 +62,7 @@ int main(int argc, char **argv) {
     while (1) {
         /* Prompt the user to enter a command or file upload */
         bzero(buf, BUFSIZE);
-        printf("Enter command (e.g., get file.txt, put file.txt, exit): ");
+        printf("Enter command: ");
         fgets(buf, BUFSIZE, stdin);
         buf[strcspn(buf, "\n")] = '\0';
 
