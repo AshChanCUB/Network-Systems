@@ -98,15 +98,23 @@ int main(int argc, char **argv) {
         if (n < 0) 
             error("ERROR in sendto");
 
-        /* Receive and print the server's response */
-        bzero(buf, BUFSIZE); // Clear the buffer
-        n = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr*)&serveraddr, &serverlen);
-        if (n < 0) 
-            error("ERROR in recvfrom");
+        // Receive and print the server's response
+        while (1) {
+            bzero(buf, BUFSIZE); // Clear the buffer
+            n = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr*)&serveraddr, &serverlen);
+            if (n < 0) 
+                error("ERROR in recvfrom");
 
-        printf("Server response:\n%s\n", buf);
+            // Check for the end-of-response marker
+            if (strcmp(buf, "END\n") == 0) {
+                break; // Exit the loop when the marker is received
+            }
+
+            // Print the received data (excluding the marker)
+            printf("%s", buf);
+        }
     }
-    }
+}
 
     close(sockfd);
     return 0;
