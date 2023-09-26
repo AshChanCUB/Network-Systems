@@ -72,7 +72,7 @@ int main(int argc, char *argv[]) {
         fgets(buffer, BUFSIZE, stdin);
 
  
-       if (strcmp(buffer, "ls\n") == 0) {
+       if (strcmp(buffer, "ls") == 0) {
             // Handle the "ls" command
             char response[BUFSIZE];
             bzero(response, BUFSIZE);
