@@ -103,6 +103,7 @@ int main(int argc, char *argv[]) {
             FILE *received_file = fopen(filename, "wb");
             if (received_file == NULL) {
                 perror("Error opening file for writing");
+                printf("File transfer failed.\n");
             } else {
                 // Receive and write the file data from the server
                 while (1) {
@@ -115,68 +116,42 @@ int main(int argc, char *argv[]) {
                 }
                 fclose(received_file);
                 printf("Received file: %s\n", filename);
-            }
-
-            // Check if the next response is the "END" marker
-            bzero(buffer, BUFSIZE);
-            n = recvfrom(sockfd, buffer, BUFSIZE, 0, (struct sockaddr *)&serveraddr, &serverlen);
-            if (n <= 0 || strcmp(buffer, "END\n") != 0) {
-                fprintf(stderr, "Failed to receive the file: %s\n", filename);
+                printf("File transfer successful.\n"); // Print success message
             }
         } else if (strncmp(buffer, "put ", 4) == 0) {
             // Handle the "put" command
             char filename[MAXFILENAME];
             sscanf(buffer, "put %s", filename);
 
-            // Check if the file exists on the client side
-            FILE *upload_file = fopen(filename, "rb");
-            if (upload_file == NULL) {
-                fprintf(stderr, "Error opening file for reading: %s\n", filename);
-                continue; // Continue to the next user input
-            }
-
-            // Send the "put" command to the server
-            n = sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr *)&serveraddr, serverlen);
-            if (n < 0) {
-                error("ERROR sending command to server");
-            }
-
-            // Send the file data to the server
-            while (1) {
-                bzero(buffer, BUFSIZE);
-                int bytes_read = fread(buffer, 1, BUFSIZE, upload_file);
-                if (bytes_read <= 0) {
-                    break; // End of file
-                }
-                n = sendto(sockfd, buffer, bytes_read, 0, (struct sockaddr *)&serveraddr, serverlen);
-                if (n < 0) {
-                    error("ERROR sending file data to server");
-                }
-            }
-
-            fclose(upload_file);
-
-            // Send the "END" marker to indicate the end of file transfer
-            char end_marker[] = "END\n";
-            n = sendto(sockfd, end_marker, strlen(end_marker), 0, (struct sockaddr *)&serveraddr, serverlen);
-            if (n < 0) {
-                error("ERROR sending file end marker to server");
-            }
-
-            // Receive the server's response
-            bzero(buffer, BUFSIZE);
-            n = recvfrom(sockfd, buffer, BUFSIZE, 0, (struct sockaddr *)&serveraddr, &serverlen);
-            if (n <= 0) {
-                fprintf(stderr, "Failed to receive server response for: %s\n", filename);
+            // Check if the file exists
+            FILE *file = fopen(filename, "rb");
+            if (file == NULL) {
+                perror("Error opening file for reading");
+                printf("File transfer failed: File not found.\n");
             } else {
-                printf("Server response: %s\n", buffer);
+                // Send the "put" command to the server
+                n = sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr *)&serveraddr, serverlen);
+                if (n < 0) {
+                    error("ERROR sending command to server");
+                    printf("File transfer failed.\n");
+                } else {
+                    // Read and send the file data to the server
+                    while ((n = fread(buffer, 1, BUFSIZE, file)) > 0) {
+                        if (sendto(sockfd, buffer, n, 0, (struct sockaddr *)&serveraddr, serverlen) < 0) {
+                            error("Error sending file data");
+                            printf("File transfer failed.\n");
+                            break;
+                        }
+                    }
+                    fclose(file);
+                    printf("File transfer successful.\n"); // Print success message
+                }
             }
         } else {
             // Send other commands to the server
             n = sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr *)&serveraddr, serverlen);
-            if (n < 0) {
+            if (n < 0)
                 error("ERROR sending command to server");
-            }
         }
     }
 
