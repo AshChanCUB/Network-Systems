@@ -124,54 +124,19 @@ int main(int argc, char *argv[]) {
                 snprintf(response, BUFSIZE, "File not found: %s", filename);
                 sendto(sockfd, response, strlen(response), 0, (struct sockaddr *)&clientaddr, clientlen);
             }
-        } else if (strncmp(buffer, "put ", 4) == 0) {
-            char filename[MAXFILENAME];
-            sscanf(buffer, "put %s", filename);
-
-            FILE *file = fopen(filename, "wb");
-            if (file == NULL) {
-                perror("Error opening file");
-            } else {
-                while (1) {
-                    bzero(buffer, BUFSIZE);
-                    n = recvfrom(sockfd, buffer, BUFSIZE, 0, (struct sockaddr *)&clientaddr, &clientlen);
-                    if (n <= 0) {
-                        break;
-                    }
-                    fwrite(buffer, 1, n, file);
-                }
-                fclose(file);
-                printf("File transfer successful: %s\n", filename); // Print success message
-
-            }
-            char end_marker[] = "END\n";
-            sendto(sockfd, end_marker, strlen(end_marker), 0, (struct sockaddr *)&clientaddr, clientlen);
-        } else if (strcmp(buffer, "ls") == 0) {
-            listFiles(sockfd, clientaddr, clientlen);
-        } else if (strncmp(buffer, "delete ", 7) == 0) {
-            char filename[BUFSIZE];
-            sscanf(buffer, "delete %s", filename);
-            if (remove(filename) == 0) {
-                printf("Deleted file: %s\n", filename);
-                char response[] = "File deleted successfully.\n";
-                sendto(sockfd, response, strlen(response), 0, (struct sockaddr *)&clientaddr, clientlen);
-            } else {
-                perror("Error deleting file");
-                char response[] = "Error deleting file.\n";
-                sendto(sockfd, response, strlen(response), 0, (struct sockaddr *)&clientaddr, clientlen);
-            }
         } else if (strcmp(buffer, "exit") == 0) {
             printf("Server is exiting gracefully.\n");
             close(sockfd);
             exit(0);
+        } else if (strcmp(buffer, "ls") == 0) {
+            listFiles(sockfd, clientaddr, clientlen);
         } else {
             char response[BUFSIZE];
             snprintf(response, BUFSIZE, "Unknown command: %s\n", buffer);
             sendto(sockfd, response, strlen(response), 0, (struct sockaddr *)&clientaddr, clientlen);
         }
 
-        char end_marker[] = "END\n";
-        sendto(sockfd, end_marker, strlen(end_marker), 0, (struct sockaddr *)&clientaddr, clientlen);
+        // The "END\n" marker is sent in the sendFile function
     }
 
     close(sockfd);
