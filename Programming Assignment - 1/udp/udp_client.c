@@ -130,6 +130,9 @@ int main(int argc, char *argv[]) {
             // Handle the "exit" command
             printf("Client is exiting.\n");
             break;
+        } else if (strcmp(buffer, "END\n") == 0) {
+            // Handle the "END" marker, e.g., after a successful "put" or "ls" command
+            printf("End of response.\n");
         } else {
             // Receive and print the server's response
             bzero(buffer, BUFSIZE);
