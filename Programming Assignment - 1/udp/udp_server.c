@@ -168,7 +168,7 @@ int main(int argc, char *argv[]) {
             }
         } else if (strcmp(buffer, "exit") == 0) {
             // Send a message to the console
-            printf("Client is exiting gracefully.\n");
+            printf("Server is exiting gracefully.\n");
             close(sockfd);
             exit(0);
         } else {
