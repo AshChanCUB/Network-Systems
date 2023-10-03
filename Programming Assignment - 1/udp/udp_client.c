@@ -32,7 +32,7 @@ void receiveFile(int sockfd, struct sockaddr_in serveraddr, socklen_t serverlen,
         if (bytes_received <= 0) {
             break;
         }
-        if (strcmp(buffer, "END\n") == 0) {
+        if (strcmp(buffer, "END") == 0) {
             break; // End of file
         }
         fwrite(buffer, 1, bytes_received, received_file);
@@ -65,8 +65,8 @@ void sendFile(int sockfd, struct sockaddr_in serveraddr, socklen_t serverlen, ch
     }
 
     fclose(file_to_send);
-    // Send the "END\n" marker to indicate the end of file transfer
-    char end_marker[] = "END\n";
+    // Send the "END" marker to indicate the end of file transfer
+    char end_marker[] = "END";
     sendto(sockfd, end_marker, strlen(end_marker), 0, (struct sockaddr *)&serveraddr, serverlen);
 }
 
@@ -125,13 +125,30 @@ int main(int argc, char *argv[]) {
             char filename[MAXFILENAME];
             sscanf(buffer, "put %s", filename);
             sendFile(sockfd, serveraddr, serverlen, filename);
+            printf("Sent file: %s\n", filename);
+        } else if (strncmp(buffer, "delete ", 7) == 0) {
+            // Handle the "delete" command
+            char filename[MAXFILENAME];
+            sscanf(buffer, "delete %s", filename);
+            printf("Deleted file: %s\n", filename);
+        } else if (strcmp(buffer, "ls\n") == 0) {
+            // Handle the "ls" command
+            char response[BUFSIZE];
+            while (1) {
+                bzero(response, BUFSIZE);
+                n = recvfrom(sockfd, response, BUFSIZE, 0, (struct sockaddr *)&serveraddr, &serverlen);
+                if (n <= 0) {
+                    break;
+                }
+                if (strcmp(response, "END") == 0) {
+                    break; // End of file list
+                }
+                printf("%s", response);
+            }
         } else if (strcmp(buffer, "exit\n") == 0) {
             // Handle the "exit" command
             printf("Client is exiting.\n");
             break;
-        } else if (strcmp(buffer, "END\n") == 0) {
-            // Handle the "END" marker, e.g., after a successful "put" or "ls" command
-            printf("End of response.\n");
         } else {
             // Receive and print the server's response
             bzero(buffer, BUFSIZE);
