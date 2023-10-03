@@ -66,7 +66,7 @@ void sendFile(int sockfd, struct sockaddr_in serveraddr, socklen_t serverlen, ch
 
     fclose(file_to_send);
     // Send the "END\n" marker to indicate the end of file transfer
-    char end_marker[] = "END\n";
+    char end_marker[] = "END";
     sendto(sockfd, end_marker, strlen(end_marker), 0, (struct sockaddr *)&serveraddr, serverlen);
 }
 
