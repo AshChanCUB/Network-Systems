@@ -1,5 +1,3 @@
-//Client
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -42,6 +40,34 @@ void receiveFile(int sockfd, struct sockaddr_in serveraddr, socklen_t serverlen,
 
     fclose(received_file);
     printf("Received file: %s\n", filename);
+}
+
+void sendFile(int sockfd, struct sockaddr_in serveraddr, socklen_t serverlen, char *filename) {
+    FILE *file_to_send = fopen(filename, "rb");
+    if (file_to_send == NULL) {
+        perror("Error opening file for reading");
+        return;
+    }
+
+    char buffer[BUFSIZE];
+    ssize_t bytes_read;
+
+    while (1) {
+        bytes_read = fread(buffer, 1, BUFSIZE, file_to_send);
+        if (bytes_read <= 0) {
+            break; // End of file
+        }
+        ssize_t bytes_sent = sendto(sockfd, buffer, bytes_read, 0, (struct sockaddr *)&serveraddr, serverlen);
+        if (bytes_sent < 0) {
+            perror("Error sending file data");
+            break;
+        }
+    }
+
+    fclose(file_to_send);
+    // Send the "END\n" marker to indicate the end of file transfer
+    char end_marker[] = "END\n";
+    sendto(sockfd, end_marker, strlen(end_marker), 0, (struct sockaddr *)&serveraddr, serverlen);
 }
 
 int main(int argc, char *argv[]) {
@@ -93,9 +119,13 @@ int main(int argc, char *argv[]) {
             // Handle the "get" command
             char filename[MAXFILENAME];
             sscanf(buffer, "get %s", filename);
-
-            // Receive and save the file from the server
             receiveFile(sockfd, serveraddr, serverlen, filename);
+        } else if (strncmp(buffer, "put ", 4) == 0) {
+            // Handle the "put" command
+            char filename[MAXFILENAME];
+            sscanf(buffer, "put %s", filename);
+            sendFile(sockfd, serveraddr, serverlen, filename);
+            printf("Sent file: %s\n", filename);
         } else if (strcmp(buffer, "exit\n") == 0) {
             // Handle the "exit" command
             printf("Client is exiting.\n");
