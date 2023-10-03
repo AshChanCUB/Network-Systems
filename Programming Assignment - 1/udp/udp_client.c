@@ -66,7 +66,7 @@ void sendFile(int sockfd, struct sockaddr_in serveraddr, socklen_t serverlen, ch
 
     fclose(file_to_send);
     // Send the "END\n" marker to indicate the end of file transfer
-    char end_marker[] = "END";
+    char end_marker[] = "END\n";
     sendto(sockfd, end_marker, strlen(end_marker), 0, (struct sockaddr *)&serveraddr, serverlen);
 }
 
@@ -125,7 +125,6 @@ int main(int argc, char *argv[]) {
             char filename[MAXFILENAME];
             sscanf(buffer, "put %s", filename);
             sendFile(sockfd, serveraddr, serverlen, filename);
-            printf("Sent file: %s\n", filename);
         } else if (strcmp(buffer, "exit\n") == 0) {
             // Handle the "exit" command
             printf("Client is exiting.\n");
