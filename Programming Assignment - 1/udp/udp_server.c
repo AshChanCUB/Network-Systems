@@ -151,8 +151,6 @@ int main(int argc, char *argv[]) {
                 char end_marker[] = "END";
                 sendto(sockfd, end_marker, strlen(end_marker), 0, (struct sockaddr *)&clientaddr, clientlen);
             }
-        } else if (strcmp(buffer, "ls") == 0) {
-            listFiles(sockfd, clientaddr, clientlen);
         } else if (strncmp(buffer, "delete ", 7) == 0) {
             char filename[BUFSIZE];
             sscanf(buffer, "delete %s", filename);
@@ -166,8 +164,9 @@ int main(int argc, char *argv[]) {
                 char response[] = "Error deleting file.\n";
                 sendto(sockfd, response, strlen(response), 0, (struct sockaddr *)&clientaddr, clientlen);
             }
+        } else if (strcmp(buffer, "ls") == 0) {
+            listFiles(sockfd, clientaddr, clientlen);
         } else if (strcmp(buffer, "exit") == 0) {
-            // Send a message to the console
             printf("Server is exiting gracefully.\n");
             close(sockfd);
             exit(0);
