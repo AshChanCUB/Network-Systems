@@ -38,12 +38,9 @@ void sendFile(int sockfd, struct sockaddr_in clientaddr, socklen_t clientlen, ch
     }
 
     fclose(file);
-
-    // Send a success message to the console
-    printf("Sent file: %s\n", filename);
-
-    // Send the "END" marker to indicate the end of file transfer
-    char end_marker[] = "END";
+    
+    // Send the "END\n" marker to indicate the end of file transfer
+    char end_marker[] = "END\n";
     sendto(sockfd, end_marker, strlen(end_marker), 0, (struct sockaddr *)&clientaddr, clientlen);
 }
 
@@ -121,6 +118,7 @@ int main(int argc, char *argv[]) {
 
             if (access(filename, F_OK) != -1) {
                 sendFile(sockfd, clientaddr, clientlen, filename);
+                printf("File transfer successful: %s\n", filename); // Print success message
             } else {
                 char response[BUFSIZE];
                 snprintf(response, BUFSIZE, "File not found: %s", filename);
@@ -143,19 +141,17 @@ int main(int argc, char *argv[]) {
                     fwrite(buffer, 1, n, file);
                 }
                 fclose(file);
+                printf("File transfer successful: %s\n", filename); // Print success message
 
-                // Send a success message to the console
-                printf("Received file: %s\n", filename);
-
-                // Send the "END" marker to indicate the end of file transfer
-                char end_marker[] = "END";
-                sendto(sockfd, end_marker, strlen(end_marker), 0, (struct sockaddr *)&clientaddr, clientlen);
             }
+            char end_marker[] = "END\n";
+            sendto(sockfd, end_marker, strlen(end_marker), 0, (struct sockaddr *)&clientaddr, clientlen);
+        } else if (strcmp(buffer, "ls") == 0) {
+            listFiles(sockfd, clientaddr, clientlen);
         } else if (strncmp(buffer, "delete ", 7) == 0) {
             char filename[BUFSIZE];
             sscanf(buffer, "delete %s", filename);
             if (remove(filename) == 0) {
-                // Send a success message to the console
                 printf("Deleted file: %s\n", filename);
                 char response[] = "File deleted successfully.\n";
                 sendto(sockfd, response, strlen(response), 0, (struct sockaddr *)&clientaddr, clientlen);
@@ -164,8 +160,6 @@ int main(int argc, char *argv[]) {
                 char response[] = "Error deleting file.\n";
                 sendto(sockfd, response, strlen(response), 0, (struct sockaddr *)&clientaddr, clientlen);
             }
-        } else if (strcmp(buffer, "ls") == 0) {
-            listFiles(sockfd, clientaddr, clientlen);
         } else if (strcmp(buffer, "exit") == 0) {
             printf("Server is exiting gracefully.\n");
             close(sockfd);
@@ -175,6 +169,9 @@ int main(int argc, char *argv[]) {
             snprintf(response, BUFSIZE, "Unknown command: %s\n", buffer);
             sendto(sockfd, response, strlen(response), 0, (struct sockaddr *)&clientaddr, clientlen);
         }
+
+        char end_marker[] = "END\n";
+        sendto(sockfd, end_marker, strlen(end_marker), 0, (struct sockaddr *)&clientaddr, clientlen);
     }
 
     close(sockfd);
