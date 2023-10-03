@@ -135,8 +135,6 @@ int main(int argc, char *argv[]) {
             snprintf(response, BUFSIZE, "Unknown command: %s\n", buffer);
             sendto(sockfd, response, strlen(response), 0, (struct sockaddr *)&clientaddr, clientlen);
         }
-
-        // The "END\n" marker is sent in the sendFile function
     }
 
     close(sockfd);
